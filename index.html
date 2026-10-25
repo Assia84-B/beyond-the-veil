@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>كتاب ما وراء الحجاب | الكاتبة أسية بلحاج - 3D Interactive Edition</title>
+
+  <!-- الخطوط الرسمية -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@300;400;600;700;800;900&family=Orbitron:wght@600;800&display=swap" rel="stylesheet" />
+
+  <!-- مكتبة Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#D91B3E',
+            cosmic: '#9DBDD8',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- مكتبة Three.js 3D عبر CDN عالمي موثوق -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Cairo', sans-serif;
+      overflow-x: hidden;
+      background-color: #060713;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 0;
+    }
+    .font-amiri { font-family: 'Amiri', serif; }
+    .font-clock { font-family: 'Orbitron', monospace; }
+
+    /* خلفية الكانفاس الثلاثي الأبعاد */
+    #webgl-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .glass-card {
+      background: rgba(18, 21, 48, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(157, 189, 216, 0.15);
+    }
+
+    .red-glow {
+      box-shadow: 0 0 25px -4px rgba(217, 27, 62, 0.6);
+    }
+    .red-glow:hover {
+      box-shadow: 0 0 35px 2px rgba(217, 27, 62, 0.85);
+    }
+
+    @keyframes radarPulse {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+    .radar-pulse {
+      animation: radarPulse 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    }
+  </style>
+</head>
+
+<body class="selection:bg-brand selection:text-white">
+
+  <!-- مشهد الـ 3D للكانفاس -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- شريط نسبة القراءة العلوي -->
+  <div id="reading-progress" class="fixed top-0 left-0 h-[3.5px] bg-gradient-to-r from-cosmic to-brand z-50 w-0 transition-all duration-150"></div>
+
+  <!-- الشريط الإخباري والوقت الحي -->
+  <div class="relative z-20 border-b border-slate-800/80 bg-[#060713]/90 py-2 px-6 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- كبسولة التوقيت الحية -->
+      <div class="flex items-center gap-3 bg-gradient-to-r from-slate-900 to-[#121633] px-3.5 py-1.5 rounded-2xl border border-slate-700/60 shadow-md">
+        <span class="px-2 py-0.5 rounded-lg bg-brand/10 text-brand font-bold text-xs" id="live-day">الجمعة</span>
+        <span class="text-slate-200 text-xs" id="live-date">...</span>
+        <span class="text-slate-500 font-light">|</span>
+        <div class="flex items-center gap-1 font-clock text-xs font-bold text-amber-400">
+          <span id="clock-hours">00</span><span class="animate-pulse text-brand">:</span>
+          <span id="clock-minutes">00</span><span class="animate-pulse text-brand">:</span>
+          <span id="clock-seconds" class="text-cosmic text-[11px]">00</span>
+        </div>
+      </div>
+
+      <!-- كبسولة الزوار المباشرة ورادار الدول -->
+      <div class="flex items-center gap-3">
+        <button class="flex items-center gap-2.5 bg-slate-900 px-3.5 py-1.5 rounded-2xl border border-slate-700/60 hover:border-brand transition" onclick="openModal('map-modal')">
+          <div class="relative flex items-center justify-center w-3 h-3">
+            <span class="absolute w-full h-full rounded-full bg-emerald-400 radar-pulse"></span>
+            <span class="relative w-2 h-2 rounded-full bg-emerald-500"></span>
+          </div>
+          <span class="text-xs text-slate-200 font-medium">
+            المتصلون الآن: <strong class="text-brand font-clock font-bold" id="visitor-count">34</strong>
+          </span>
+          <span class="text-slate-500 text-xs">&#8226;</span>
+          <span class="text-xs text-cosmic">🌍 نسب الدول (%)</span>
+        </button>
+
+        <button class="hover:text-brand transition underline text-xs text-slate-400" onclick="openModal('privacy-modal')">سياسة الخصوصية</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- الهيدر -->
+  <header class="sticky top-0 z-20 border-b border-slate-800/80 bg-[#070814]/85 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-3">
+        <span class="text-2xl sm:text-3xl font-extrabold font-amiri tracking-wide">
+          ما وراء <span class="text-brand">الحجاب</span>
+        </span>
+        <span class="text-xs text-slate-400 border-r border-slate-700 pr-3 hidden md:inline">| الكاتبة أسية بلحاج</span>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-300">
+        <a href="#hero" class="hover:text-brand transition">الرئيسية</a>
+        <a href="#summary" class="hover:text-brand transition">عن الكتاب</a>
+        <a href="#documents" class="hover:text-brand transition text-brand font-bold">معرض الوثائق</a>
+        <a href="#author" class="hover:text-brand transition">السيرة الذاتية</a>
+      </nav>
+
+      <a href="https://amzn.eu/d/0iaVGlok" target="_blank" class="bg-brand hover:bg-[#b81432] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-full transition red-glow">
+        شراء الكتاب من أمازون
+      </a>
+    </div>
+  </header>
+
+  <!-- المحتوى الرئيسي (يطفو بانسيابية فوق الـ 3D Canvas) -->
+  <main class="relative z-10">
+
+    <!-- قسم الهيرو التفاعلي -->
+    <section id="hero" class="min-h-screen flex items-center py-16 px-6">
+      <div class="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        
+        <div class="lg:col-span-7 space-y-6 text-center lg:text-right">
+          <div class="inline-block px-4 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 text-xs text-brand font-bold">
+            شهادات رسمية موثقة من الرئاسة الإيطالية وحاضرة الفاتيكان
+          </div>
+
+          <h1 class="text-4xl sm:text-6xl font-extrabold font-amiri leading-tight">
+            ما وراء <span class="text-brand">الحجاب</span>
+          </h1>
+
+          <p class="text-lg sm:text-xl text-cosmic font-light max-w-xl mx-auto lg:mx-0">
+            من امرأة أجنبية إلى مواطنة.. سيرة التحدي وصناعة الأثر في قلب أوروبا
+          </p>
+
+          <p class="text-slate-300 leading-relaxed text-sm sm:text-base max-w-xl mx-auto lg:mx-0">
+            سيرة حقيقية وتجربة ملهمة لامرأة مسلمة جزائرية استطاعت بإرادتها أن تبني جسور الحوار بين الحضارات، وتخوض غمار العمل الحقوقي والسياسي كأول مرشحة محجبة في تاريخ الانتخابات الإقليمية الإيطالية.
+          </p>
+
+          <div class="pt-4 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+            <a href="https://amzn.eu/d/0iaVGlok" target="_blank" class="w-full sm:w-auto bg-brand hover:bg-[#b81432] text-white font-bold px-8 py-3.5 rounded-xl transition duration-300 red-glow text-center">
+              اطلب نسختك من أمازون
+            </a>
+            <div class="text-xs text-slate-400 flex items-center gap-2">
+              <span class="text-brand text-lg animate-pulse">✦</span>
+              <span>حرك الفأرة للتفاعل مع غلاف الكتاب ثلاثي الأبعاد</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- فراغ تموضع الكتاب 3D في الشاشات العريضة -->
+        <div class="lg:col-span-5 h-[380px] sm:h-[480px]"></div>
+
+      </div>
+    </section>
+
+    <!-- معرض الوثائق والشهادات -->
+    <section id="documents" class="py-24 px-6 border-t border-slate-800/80 bg-[#070814]/90 backdrop-blur-md">
+      <div class="max-w-6xl mx-auto space-y-14">
+        
+        <div class="text-center space-y-3">
+          <div class="inline-block px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-bold">
+            أوسمة واعترافات دولية رفيعة
+          </div>
+          <h2 class="text-3xl sm:text-5xl font-extrabold font-amiri">معرض الوثائق والشهادات الرسمية</h2>
+          <div class="w-24 h-1 bg-brand mx-auto rounded-full"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          <!-- وثيقة الرئيس الإيطالي -->
+          <div class="glass-card rounded-3xl p-6 border-r-4 border-amber-500 space-y-4 hover:translate-y-[-4px] transition duration-300">
+            <div class="flex items-center gap-2 text-xs text-amber-400 font-bold">
+              <span>📜 رئاسة الجمهورية الإيطالية (قصر كويرينالي)</span>
+            </div>
+            <h3 class="text-xl font-bold font-amiri">رسالة شكر وتقدير شخصية بخط يد الرئيس "سيرجيو ماتاريلا"</h3>
+            <blockquote class="p-4 rounded-xl bg-amber-500/5 border-r-2 border-amber-500 text-sm font-amiri text-slate-200">
+              «سيدتي الفاضلة.. أشكركِ جزيلاً على إهدائكِ اللطيف لكتاب "ما وراء الحجاب". إن تجاوز الأحكام المسبقة، والتعارف والتلاقي، والاحترام المتبادل، كلها قيم ترتقي بجودة الحياة للجميع.»
+            </blockquote>
+          </div>
+
+          <!-- وثيقة الفاتيكان -->
+          <div class="glass-card rounded-3xl p-6 border-r-4 border-blue-500 space-y-4 hover:translate-y-[-4px] transition duration-300">
+            <div class="flex items-center gap-2 text-xs text-blue-400 font-bold">
+              <span>🕊️ أمانة سر دولة الفاتيكان</span>
+            </div>
+            <h3 class="text-xl font-bold font-amiri">رسالة تقدير وبركة باسم قداسة البابا فرنسيس</h3>
+            <blockquote class="p-4 rounded-xl bg-blue-500/5 border-r-2 border-blue-500 text-sm font-amiri text-slate-200">
+              «يحث قداسة البابا الكاتبة أسية بلحاج على مواصلة مسيرتها على طريق المعرفة والاندماج الإنساني، للمساهمة في بناء مجتمع أكثر عدلاً وإنسانية تترسخ فيه قيم الأخوة والسلام.»
+            </blockquote>
+          </div>
+
+          <!-- حركة الفوكولاري -->
+          <div class="glass-card rounded-3xl p-6 border-r-4 border-brand space-y-4 hover:translate-y-[-4px] transition duration-300">
+            <div class="flex items-center gap-2 text-xs text-brand font-bold">
+              <span>🤝 حركة الفوكولاري العالمية لحوار الأديان</span>
+            </div>
+            <h3 class="text-xl font-bold font-amiri">رسالة إشادة من الرئيسة "ماريا فوتشي"</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              إشادة دولية تثني على شجاعة الكاتبة المبدئية، وتعتبر كتاب "ما وراء الحجاب" أداة محورية لتعزيز الحوار بين الثقافات والأديان.
+            </p>
+          </div>
+
+          <!-- الصليب الأحمر -->
+          <div class="glass-card rounded-3xl p-6 border-r-4 border-emerald-500 space-y-4 hover:translate-y-[-4px] transition duration-300">
+            <div class="flex items-center gap-2 text-xs text-emerald-400 font-bold">
+              <span>🚑 الصليب الأحمر الإيطالي (Croce Rossa Italiana)</span>
+            </div>
+            <h3 class="text-xl font-bold font-amiri">شهادة مسعفة طوارئ ونقل صحي معتمدة</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              ترخيص كفاءة رسمي باجتياز دورات التدخل الإسعافي السريع (TSSA)، تجسيداً لقيم الاندماج والعمل التطوعي والإنساني في إيطاليا.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ملخص الكتاب -->
+    <section id="summary" class="py-20 px-6">
+      <div class="max-w-4xl mx-auto space-y-6 text-center">
+        <h2 class="text-3xl sm:text-4xl font-extrabold font-amiri">عن كتاب "ما وراء الحجاب"</h2>
+        <div class="w-20 h-1 bg-brand mx-auto rounded-full"></div>
+        <div class="glass-card p-8 rounded-3xl text-slate-300 text-sm sm:text-base leading-relaxed text-right space-y-4">
+          <p>كتاب يوثق بجرأة وشفافية يوميات امرأة مسلمة محجبة، خاضت غمار الهجرة من وطنها الأم الجزائر إلى إيطاليا، لتتحول من مجرد "امرأة أجنبية" إلى "مواطنة فاعلة" تصنع التغيير وتخترق الحواجز الاجتماعية والسياسية.</p>
+          <p>يناقش قضايا الهوية الفردية، التمسك بالجذور، والتفاعل الذكي مع قيم المجتمعات الغربية دون ذوبان أو عزلة.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- السيرة الذاتية -->
+    <section id="author" class="py-20 px-6 bg-[#070814]/80 border-t border-slate-800">
+      <div class="max-w-4xl mx-auto glass-card rounded-3xl p-8 sm:p-12 space-y-8">
+        <div class="text-center space-y-2">
+          <h2 class="text-3xl sm:text-4xl font-extrabold font-amiri">الأستاذة أسية بلحاج</h2>
+          <p class="text-brand text-sm font-semibold">Assia Belhadj | مسيرة ريادية في العمل الحقوقي والأكاديمي</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm text-slate-300">
+          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">✓ أول امرأة محجبة تخوض الانتخابات الإقليمية في إيطاليا (2020)</div>
+          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">✓ مترجمة محلفة معتمدة لدى المحاكم الإيطالية (2021-2022)</div>
+          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">✓ مؤسسة ورئيسة "حركة النساء في إيطاليا" (2021-2022)</div>
+          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">✓ دبلوم وسيطة ثقافية واجتماعية في إيطاليا (2015)</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- نافذة خريطة ونسب الدول -->
+  <div id="map-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+    <div class="max-w-md w-full glass-card rounded-3xl p-6 space-y-5 border border-slate-700 relative text-right">
+      <button class="absolute top-4 left-4 text-slate-400 hover:text-white" onclick="closeModal('map-modal')">✕</button>
+      <h3 class="text-xl font-bold font-amiri">نسب توزيع الزوار (%)</h3>
+      <div class="space-y-3 text-xs">
+        <div>
+          <div class="flex justify-between mb-1"><span>🇩🇿 الجزائر (الوطن الأم)</span><span class="text-emerald-400 font-clock">42%</span></div>
+          <div class="w-full h-1.5 rounded-full bg-slate-800"><div class="h-full bg-emerald-500 rounded-full" style="width: 42%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>🇮🇹 إيطاليا (بلد النشاط)</span><span class="text-blue-400 font-clock">33%</span></div>
+          <div class="w-full h-1.5 rounded-full bg-slate-800"><div class="h-full bg-blue-500 rounded-full" style="width: 33%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1"><span>🇪🇺 أوروبا الغربية</span><span class="text-amber-400 font-clock">15%</span></div>
+          <div class="w-full h-1.5 rounded-full bg-slate-800"><div class="h-full bg-amber-500 rounded-full" style="width: 15%"></div></div>
+        </div>
+      </div>
+      <button class="w-full py-2 bg-brand rounded-xl text-xs font-bold" onclick="closeModal('map-modal')">إغلاق</button>
+    </div>
+  </div>
+
+  <!-- نافذة سياسة الخصوصية -->
+  <div id="privacy-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+    <div class="max-w-xl w-full glass-card rounded-3xl p-6 space-y-4 border border-slate-700 relative text-right">
+      <button class="absolute top-4 left-4 text-slate-400 hover:text-white" onclick="closeModal('privacy-modal')">✕</button>
+      <h3 class="text-xl font-bold font-amiri">سياسة الخصوصية</h3>
+      <p class="text-xs text-slate-300 leading-relaxed">
+        نحن نحترم خصوصيتك. لا نقوم بتسجيل أو تخزين بيانات تعريف شخصية. يتم استخدام الذاكرة المؤقتة لتحسين تجربة تصفح وعرض عناصر الـ 3D فقط بما يتوافق مع معايير حماية البيانات الدولية (GDPR).
+      </p>
+      <button class="w-full py-2 bg-brand rounded-xl text-xs font-bold" onclick="closeModal('privacy-modal')">حسناً، فهمت</button>
+    </div>
+  </div>
+
+  <!-- الفوتر -->
+  <footer class="border-t border-slate-800 py-8 px-6 bg-[#060713] text-xs text-slate-400">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>جميع الحقوق محفوظة © كتاب ما وراء الحجاب | الكاتبة أسية بلحاج</div>
+      <div class="flex items-center gap-4">
+        <a href="https://amzn.eu/d/0iaVGlok" target="_blank" class="text-brand font-bold">متجر أمازون</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== البرمجة التفاعلية ومحرك 3D ==================== -->
+  <script>
+    // 1. إعداد مشهد الـ 3D (Three.js)
+    const canvas = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 7);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // الإضاءات
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambientLight);
+
+    const redLight = new THREE.PointLight(0xd91b3e, 2.5, 20);
+    redLight.position.set(4, 3, 4);
+    scene.add(redLight);
+
+    const blueLight = new THREE.PointLight(0x9dbdd8, 2, 20);
+    blueLight.position.set(-4, -2, 3);
+    scene.add(blueLight);
+
+    // مجسم الكتاب (3D Book Mesh)
+    const bookGroup = new THREE.Group();
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.setCrossOrigin('anonymous');
+
+    const coverUrl = 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgjU2opKiZwc73qF2ZhoyqJd3OkWTUOlLvOARWQeroe8Kj5SWnncIrxqzAOR0Ctpe4A7scBvTMg8hSUtsBQrD7Ln_hAZzAr7bzHEcFIiqj1rszzV-Elbo0KtkYyOeUhiaRKNyhWoh8qC7ltqQouEg5uheVTkEVU8ohIwmD2o9dwiwCdAWOU5-7T0NTX81bG/s1373/Asia.jpeg';
+
+    const frontCoverTexture = textureLoader.load(coverUrl);
+    const pagesMat = new THREE.MeshStandardMaterial({ color: 0xe6e4db, roughness: 0.8 });
+    const spineMat = new THREE.MeshStandardMaterial({ color: 0x111322, roughness: 0.4 });
+    const backMat = new THREE.MeshStandardMaterial({ color: 0x0a0c18, roughness: 0.4 });
+    const frontMat = new THREE.MeshStandardMaterial({ map: frontCoverTexture, roughness: 0.2, metalness: 0.1 });
+
+    const bookMaterials = [pagesMat, spineMat, pagesMat, pagesMat, frontMat, backMat];
+    const bookGeometry = new THREE.BoxGeometry(2.4, 3.4, 0.45);
+    const bookMesh = new THREE.Mesh(bookGeometry, bookMaterials);
+    bookGroup.add(bookMesh);
+
+    bookGroup.position.set(window.innerWidth > 1024 ? 2.0 : 0, 0, 0);
+    bookGroup.rotation.set(0.15, -0.45, 0.05);
+    scene.add(bookGroup);
+
+    // الجزيئات الكونية (Cosmic Particles)
+    const particleGeometry = new THREE.BufferGeometry();
+    const count = 300;
+    const posArray = new Float32Array(count * 3);
+    for (let i = 0; i < count * 3; i++) {
+      posArray[i] = (Math.random() - 0.5) * 18;
+    }
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+    const particleMat = new THREE.PointsMaterial({ size: 0.035, color: 0x9dbdd8, transparent: true, opacity: 0.7 });
+    const particles = new THREE.Points(particleGeometry, particleMat);
+    scene.add(particles);
+
+    // تفاعل الماوس والدوران
+    let targetRotY = -0.45;
+    let targetRotX = 0.15;
+
+    window.addEventListener('mousemove', (e) => {
+      const mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      const mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+      targetRotY = -0.45 + mouseX * 0.4;
+      targetRotX = 0.15 - mouseY * 0.3;
+    });
+
+    window.addEventListener('scroll', () => {
+      const scrollProgress = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+      bookGroup.rotation.z = 0.05 + scrollProgress * 1.5;
+      bookGroup.position.y = scrollProgress * 1.2;
+
+      document.getElementById('reading-progress').style.width = (scrollProgress * 100) + '%';
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      bookGroup.position.x = window.innerWidth > 1024 ? 2.0 : 0;
+    });
+
+    // دورة التصيير المستمرة
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const elapsed = clock.getElapsedTime();
+
+      bookGroup.rotation.y += (targetRotY - bookGroup.rotation.y) * 0.05;
+      bookGroup.rotation.x += (targetRotX - bookGroup.rotation.x) * 0.05;
+      bookGroup.position.y += Math.sin(elapsed * 2) * 0.0015;
+      particles.rotation.y = elapsed * 0.02;
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // 2. إدارة التوقيت والعداد الحي
+    function updateClock() {
+      const now = new Date();
+      const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+      const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+      document.getElementById('live-day').textContent = days[now.getDay()];
+      document.getElementById('live-date').textContent = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+      document.getElementById('clock-hours').textContent = String(now.getHours()).padStart(2, '0');
+      document.getElementById('clock-minutes').textContent = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('clock-seconds').textContent = String(now.getSeconds()).padStart(2, '0');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // محاكاة ذكية لعدد الزوار الحي في المتصفح
+    setInterval(() => {
+      const el = document.getElementById('visitor-count');
+      let val = parseInt(el.textContent) || 30;
+      val += (Math.random() > 0.5 ? 1 : -1);
+      if (val < 20) val = 25;
+      el.textContent = val;
+    }, 5000);
+
+    // النوافذ المنبثقة
+    function openModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    }
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+    }
+  </script>
+</body>
+</html>
